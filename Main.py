@@ -12,10 +12,16 @@ import json
 load_dotenv()
 SUBNET_1 = os.getenv("SUBNET_1")
 SUBNET_2 = os.getenv("SUBNET_2")
-
+EXCEL_FILE = os.getenv("EXCEL_FILE")
+JSON_FILE = os.getenv("JSON_FILE")
+HTML_FILE = os.getenv("HTML_FILE")
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
-
+handler = logging.FileHandler('app.log', encoding='utf-8')
+handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logging.getLogger().addHandler(handler)
 
 
 def clear_mac_ip_pairs_table():
@@ -71,11 +77,57 @@ def scan_and_to_database(subnet):
 
 
 def convert_excel_to_json(excel_file_path):
+    try:
+        workbook = load_workbook(excel_file_path)
+        json_data = []
+
+        for sheet in workbook.sheetnames:
+            for row in workbook[sheet].iter_rows(min_row=4, values_only=True):
+                json_row = dict(zip(get_column_names(), row))
+                json_data.append(json_row)
+
+                logging.info(f'Прочитана строка из Excel: {json_row}')
+
+        with open(JSON_FILE, 'w', encoding='utf-8') as json_file:
+            json.dump(json_data, json_file, ensure_ascii=False, indent=2)
+
+        return JSON_FILE
+    except Exception as e:
+        logging.error(f'Ошибка при конвертации Excel в JSON: {str(e)}')
+        return None
+
 
 def update_html_with_json(json_file_path, html_file_path):
+    try:
+        with open(json_file_path, 'r', encoding='utf-8') as json_file:
+            json_data = json.load(json_file)
+
+        json_string = json.dumps(json_data, ensure_ascii=False, indent=2)
+
+        with open(html_file_path, 'r', encoding='utf-8') as html_file:
+            html_content = html_file.read()
+
+        start_index = html_content.find("var jsonData =")
+        end_index = html_content.find(";", start_index)
+
+        if start_index != -1 and end_index != -1:
+            html_content = html_content[:start_index + len("var jsonData =\n")] + json_string + html_content[end_index:]
+
+            logging.info(f'Обновлен HTML с использованием следующих данных JSON:\n{{ {json_string} }}')
+
+            with open(html_file_path, 'w', encoding='utf-8') as html_file:
+                html_file.write(html_content)
+
+            logging.info('HTML успешно обновлен.')
+        else:
+            logging.error('Не удалось найти блок данных JSON в HTML файле.')
+
+    except Exception as e:
+        logging.error(f'Ошибка при обновлении HTML с использованием JSON: {str(e)}')
+
 
 def get_column_names():
-
+    return ["Должность", "ФИО", "Рабочий", "Внутренний", "Сотовый", "Местоположение", "Email", "Дата рождения"]
 
 
 if __name__ == "__main__":
@@ -85,5 +137,9 @@ if __name__ == "__main__":
     scan_and_to_database(SUBNET_1)
     scan_and_to_database(SUBNET_2)
 
+    JSON_FILE = convert_excel_to_json(EXCEL_FILE)
+
+    if JSON_FILE:
+        update_html_with_json(JSON_FILE, HTML_FILE)
 
     logging.info('Программа успешно выполнена.')
