@@ -1,5 +1,8 @@
 import logging
 import os
+import subprocess
+import requests
+from requests.auth import HTTPDigestAuth
 
 import scapy.all as sc
 from openpyxl import load_workbook
@@ -8,6 +11,10 @@ import DB
 from DB import create_tables
 from dotenv import load_dotenv
 import json
+
+from flask import Flask, request
+
+app = Flask(__name__)
 
 load_dotenv()
 SUBNET_1 = os.getenv("SUBNET_1")
